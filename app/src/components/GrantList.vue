@@ -3,19 +3,18 @@
   <BaseFilterNav :items="grantRegistryListNav" :button="button" title="grants:" />
   <ul class="base-grid">
     <li v-for="grant in sortedGrants" :key="grant.id.toString()">
-      <!-- ToDo: Raised data -->
       <GrantCard
         :id="grant.id"
-        :name="grantMetadata[grant.metaPtr].name ?? ''"
+        :name="(grantMetadataResolved && grantMetadataResolved[grant.metaPtr]?.name) || ''"
         :ownerAddress="grant.owner"
-        :imgurl="grantMetadata[grant.metaPtr].logoURI || '/placeholder_grant.svg'"
+        :imgurl="(grantMetadataResolved && grantMetadataResolved[grant.metaPtr]?.logoURI) || '/placeholder_grant.svg'"
       />
     </li>
   </ul>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, PropType, ref } from 'vue';
+import { computed, defineComponent, onUnmounted, PropType, ref, watch } from 'vue';
 // --- App Imports ---
 import BaseFilterNav from 'src/components/BaseFilterNav.vue';
 import GrantCard from 'src/components/GrantCard.vue';
@@ -89,12 +88,31 @@ export default defineComponent({
   setup(props) {
     const { addToCart, isInCart, removeFromCart } = useCartStore();
 
+    const sortedGrants = ref<Grant[]>([]);
+    const grantRegistryListNav = ref<FilterNavItem[]>([]);
+    const grantMetadataResolved = ref<Record<string, GrantMetadataResolution>>({});
+    // watch for changes on the grants and call useSortedGrants again
+    watch(
+      () => [props.grants, props.grantMetadata],
+      () => {
+        const { sortedGrants: _sortedGrants, grantRegistryListNav: _grantRegistryListNav } = useSortedGrants([
+          ...props.grants,
+        ]);
+        sortedGrants.value = _sortedGrants.value;
+        grantRegistryListNav.value = _grantRegistryListNav.value;
+        grantMetadataResolved.value = props.grantMetadata;
+      },
+      { immediate: true }
+    );
+
     onUnmounted(() => {
       grantsSortingMode.value = defaultSortingMode;
     });
 
     return {
-      ...useSortedGrants(props.grants),
+      sortedGrants,
+      grantRegistryListNav,
+      grantMetadataResolved,
       isInCart,
       addToCart,
       removeFromCart,
